@@ -49,6 +49,44 @@ h3{margin:0 0 6px;font-size:16px}
 .kv4 .k{font-weight:600}
 .kv4 .e{font-size:20px;line-height:1.25;text-align:center}
 .intro-t{color:var(--tx);margin:14px 0 4px;font-size:17px}
+
+/* ===== PERLINDUNGAN TAMPILAN TES ===== */
+#exam-watermark {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: none;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.wm-item {
+  position: absolute;
+  color: var(--tx);
+  opacity: .16;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  transform: rotate(-28deg);
+}
+#screen-guard {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  color: #fff;
+  background: rgba(12,17,29,.97);
+  backdrop-filter: blur(18px);
+}
+#screen-guard.visible { display: flex; }
+.guard-content { max-width: 360px; }
+.guard-content h2 { margin-bottom: 12px; }
+
 </style>
 </head>
 <body>
@@ -110,6 +148,16 @@ h3{margin:0 0 6px;font-size:16px}
 </section>
 
 </div>
+
+<!-- Watermark dan layar perlindungan -->
+<div id="exam-watermark" aria-hidden="true"></div>
+<div id="screen-guard" role="status" aria-live="polite">
+  <div class="guard-content">
+    <h2>🔒 Sesi Tes Terlindungi</h2>
+    <p>Halaman tes sedang tidak aktif. Kembali ke halaman ujian untuk melanjutkan.</p>
+  </div>
+</div>
+
 <script>
 const API = "https://script.google.com/macros/s/AKfycbxSHzEM62be9NC9y173hRWqIdjxLArsoWGxMStoSb2cN_n_brQgrAPxuLQ6eeoYHvtARw/exec";
 const MAXV = 3;                          // batas pelanggaran sebelum tes otomatis diakhiri
@@ -123,6 +171,30 @@ async function api(body){
   return r.json();
 }
 const isImg = s => /^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg)(\?\S*)?$/i.test(s);
+
+// ===== WATERMARK IDENTITAS PESERTA =====
+function activateWatermark() {
+  const wm = $('exam-watermark');
+  const label = 'CONFIDENTIAL | PESERTA: ' + token.slice(-4);
+  wm.innerHTML = '';
+
+  // Watermark berulang agar tetap terlihat pada potongan screenshot.
+  for (let i = 0; i < 24; i++) {
+    const item = document.createElement('span');
+    item.className = 'wm-item';
+    item.textContent = label;
+    item.style.left = ((i % 4) * 27 - 5) + '%';
+    item.style.top = (Math.floor(i / 4) * 24 + 3) + '%';
+    wm.appendChild(item);
+  }
+  wm.style.display = 'block';
+}
+
+function removeProtection() {
+  $('screen-guard').classList.remove('visible');
+  $('exam-watermark').style.display = 'none';
+}
+
 // ===== PRELOAD GAMBAR SOAL =====
 function preloadImages(data) {
   data.subtes.forEach(sub => {
@@ -256,6 +328,7 @@ function endSub(){
 
 async function finish(){
   active = false; clearInterval(tick); exitFS();
+  removeProtection();
   show('done');
   $('d-judul').textContent = 'Menyimpan jawaban...'; $('d-isi').textContent = 'Jangan tutup halaman ini.';
   $('btnRetry').hidden = true;
@@ -275,17 +348,42 @@ async function finish(){
 function cekTombol(){ $('btnStart').disabled = !$('tok').value.trim(); }
 $('tok').addEventListener('input', cekTombol);
 
-// ===== Deteksi pelanggaran =====
-function flag(){
+// ===== DETEKSI PELANGGARAN =====
+let lastViolationAt = 0;
+function flag(reason = 'Meninggalkan halaman tes'){
   if(!active) return;
+
+  // Satu perpindahan dapat memicu visibilitychange dan fullscreenchange.
+  // Jeda ini mencegah satu kejadian dihitung dua kali.
+  const now = Date.now();
+  if(now - lastViolationAt < 1500) return;
+  lastViolationAt = now;
+
   viol++;
   $('warn').hidden = false;
-  $('warn').textContent = 'Peringatan: Anda meninggalkan halaman tes (' + viol + '/' + MAXV + '). Pelanggaran dicatat.';
+  $('warn').textContent = 'Peringatan: ' + reason + ' (' + viol + '/' + MAXV + '). Pelanggaran dicatat.';
+
   if(viol >= MAXV) finish();
-  else if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+  else if(!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(()=>{});
+  }
 }
-document.addEventListener('visibilitychange', () => { if(document.hidden) flag(); });
-document.addEventListener('fullscreenchange', () => { if(!document.fullscreenElement) flag(); });
+
+document.addEventListener('visibilitychange', () => {
+  if(!active) return;
+  if(document.hidden) {
+    $('screen-guard').classList.add('visible');
+    flag('Meninggalkan halaman atau berpindah aplikasi');
+  } else {
+    $('screen-guard').classList.remove('visible');
+  }
+});
+
+document.addEventListener('fullscreenchange', () => {
+  if(active && !document.fullscreenElement) {
+    flag('Keluar dari mode layar penuh');
+  }
+});
 document.addEventListener('contextmenu', e => e.preventDefault());
 ['copy','cut','paste'].forEach(ev => document.addEventListener(ev, e => { if(e.target.id !== 'tok') e.preventDefault(); }));
 window.addEventListener('beforeunload', e => { if(active){ e.preventDefault(); e.returnValue = ''; } });
