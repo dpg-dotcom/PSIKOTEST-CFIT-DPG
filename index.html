@@ -123,7 +123,29 @@ async function api(body){
   return r.json();
 }
 const isImg = s => /^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg)(\?\S*)?$/i.test(s);
+// ===== PRELOAD GAMBAR SOAL =====
+function preloadImages(data) {
+  data.subtes.forEach(sub => {
+    sub.soal.forEach(it => {
 
+      if (it.gambar) {
+        const img = new Image();
+        img.src = it.gambar;
+      }
+
+      if (it.opts) {
+        it.opts.forEach(o => {
+          if (o.t && isImg(o.t)) {
+            const img = new Image();
+            img.src = o.t;
+          }
+        });
+      }
+
+    });
+  });
+}
+  
 async function mulai(){
   token = $('tok').value.trim().toUpperCase();
   if(!token) return;
@@ -132,7 +154,13 @@ async function mulai(){
   try{
     const r = await api({action:'start', token});
     if(!r.ok){ $('err').textContent = r.msg; $('btnStart').disabled = false; exitFS(); return; }
-    S = r; si = 0; introSub();
+ S = r;
+si = 0;
+
+// Muat gambar seluruh soal di latar belakang
+preloadImages(S);
+
+introSub();
   }catch(e){
     $('err').textContent = 'Gagal terhubung. Periksa koneksi lalu coba lagi.';
     $('btnStart').disabled = false; exitFS();
