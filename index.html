@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tes Kemampuan</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--tx:#1c1f24;--mut:#666;--pri:#2563eb;--bd:#d9dce1;--bad:#c62828}
+@media(prefers-color-scheme:dark){:root{--bg:#14161a;--card:#1e2126;--tx:#eceef1;--mut:#9aa0a8;--pri:#5b8def;--bd:#343941;--bad:#ef6b6b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,sans-serif;display:flex;justify-content:center;padding:16px;min-height:100vh;user-select:none;-webkit-user-select:none}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:24px;width:100%;max-width:640px;align-self:flex-start}
+h1,h2{margin:0 0 8px}
+p{color:var(--mut);margin:8px 0}
+input{width:100%;padding:12px;font-size:18px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);text-transform:uppercase;letter-spacing:2px;margin:12px 0}
+button{font:inherit;cursor:pointer}
+.btn{background:var(--pri);color:#fff;border:0;border-radius:8px;padding:12px 20px;margin-top:12px}
+.btn:disabled{opacity:.5}
+.opt{display:block;width:100%;text-align:left;background:var(--bg);color:var(--tx);border:2px solid var(--bd);border-radius:8px;padding:12px;margin:8px 0}
+.opt.on{border-color:var(--pri);background:color-mix(in srgb,var(--pri) 15%,var(--bg))}
+.top{display:flex;justify-content:space-between;font-weight:600;margin-bottom:12px}
+#timer.low{color:var(--bad)}
+#warn{background:color-mix(in srgb,var(--bad) 15%,var(--card));color:var(--bad);border-radius:8px;padding:8px 12px;margin-bottom:12px}
+#err{color:var(--bad)}
+img{max-width:100%;border-radius:8px;margin:8px 0}
+.opt img{max-height:120px;margin:0}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row .opt{width:auto;min-width:58px;text-align:center;font-weight:600}
+#qimg img{width:100%;height:auto}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="card">
+
+<section id="s-login" class="scr">
+  <h1>Tes Kemampuan</h1>
+  <p>Masukkan kode token dari panitia. Tes hanya bisa dibuka satu kali. Tutup aplikasi lain dan jangan berpindah tab selama tes.</p>
+  <input id="tok" placeholder="KODE TOKEN" autocomplete="off" maxlength="12">
+  <div id="err"></div>
+  <button class="btn" id="btnStart" onclick="mulai()">Mulai</button>
+</section>
+
+<section id="s-intro" class="scr" hidden>
+  <h2 id="i-nama"></h2>
+  <p id="i-info"></p>
+  <p id="i-pet"></p>
+  <p>Waktu mulai berjalan setelah Anda menekan tombol di bawah, dan Anda tidak bisa kembali ke soal sebelumnya.</p>
+  <button class="btn" onclick="beginSub()">Mulai subtes</button>
+</section>
+
+<section id="s-quiz" class="scr" hidden>
+  <div id="warn" hidden></div>
+  <div class="top"><span id="prog"></span><span id="timer"></span></div>
+  <div id="q"></div>
+  <div id="qimg"></div>
+  <div id="opts"></div>
+  <button class="btn" id="btnNext" onclick="next()">Lanjut</button>
+</section>
+
+<section id="s-done" class="scr" hidden>
+  <h2 id="d-judul">Menyimpan jawaban...</h2>
+  <p id="d-isi">Jangan tutup halaman ini.</p>
+  <button class="btn" id="btnRetry" onclick="finish()" hidden>Coba kirim ulang</button>
+</section>
+
+</div>
+<script>
+const API = "GANTI_DENGAN_URL_WEB_APP"; // URL deployment Apps Script (berakhiran /exec)
+const MAXV = 3;                          // batas pelanggaran sebelum tes otomatis diakhiri
+
+const $ = id => document.getElementById(id);
+let S, token, si = 0, qi = 0, ans = {}, viol = 0, active = false, deadline, tick;
+
+function show(n){ document.querySelectorAll('.scr').forEach(s => s.hidden = s.id !== 's-' + n); }
+async function api(body){
+  const r = await fetch(API, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(body)});
+  return r.json();
+}
+const isImg = s => /^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg)(\?\S*)?$/i.test(s);
+
+async function mulai(){
+  token = $('tok').value.trim().toUpperCase();
+  if(!token) return;
+  $('btnStart').disabled = true; $('err').textContent = '';
+  try{ await document.documentElement.requestFullscreen(); }catch(e){}
+  try{
+    const r = await api({action:'start', token});
+    if(!r.ok){ $('err').textContent = r.msg; $('btnStart').disabled = false; exitFS(); return; }
+    S = r; si = 0; introSub();
+  }catch(e){
+    $('err').textContent = 'Gagal terhubung. Periksa koneksi lalu coba lagi.';
+    $('btnStart').disabled = false; exitFS();
+  }
+}
+function exitFS(){ if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); }
+
+function introSub(){
+  const s = S.subtes[si];
+  $('i-nama').textContent = s.nama;
+  $('i-info').textContent = s.soal.length + ' soal, waktu ' + s.menit + ' menit.';
+  $('i-pet').textContent = s.petunjuk;
+  show('intro');
+}
+
+function beginSub(){
+  qi = 0; active = true;
+  deadline = Date.now() + S.subtes[si].menit * 60000;
+  clearInterval(tick);
+  tick = setInterval(() => {
+    const left = Math.max(0, deadline - Date.now());
+    const m = Math.floor(left/60000), d = Math.floor(left/1000) % 60;
+    $('timer').textContent = m + ':' + String(d).padStart(2,'0');
+    $('timer').className = left < 30000 ? 'low' : '';
+    if(left <= 0) endSub();
+  }, 250);
+  if(!S.subtes[si].soal.length){ endSub(); return; }
+  renderQ(); show('quiz');
+}
+
+function renderQ(){
+  const sub = S.subtes[si], it = sub.soal[qi];
+  $('prog').textContent = sub.nama + ' - Soal ' + (qi+1) + '/' + sub.soal.length;
+  $('q').textContent = it.soal + (it.pilih > 1 ? ' (pilih ' + it.pilih + ' jawaban)' : '');
+  $('qimg').innerHTML = '';
+  if(it.gambar){ const im = document.createElement('img'); im.src = it.gambar; $('qimg').appendChild(im); }
+  const box = $('opts'); box.innerHTML = '';
+  const huruf = it.opts.every(o => !o.t); // mode gambar utuh: tombol huruf saja
+  box.className = huruf ? 'row' : '';
+  it.opts.forEach((o, i) => {
+    const b = document.createElement('button');
+    b.className = 'opt' + ([].concat(ans[it.id] || []).includes(o.k) ? ' on' : '');
+    const lab = huruf ? o.k : String.fromCharCode(65 + i) + '. ';
+    if(isImg(o.t)){ b.append(lab); const im = document.createElement('img'); im.src = o.t; b.appendChild(im); }
+    else b.textContent = lab + o.t;
+    b.onclick = () => pick(it, o.k);
+    box.appendChild(b);
+  });
+  $('btnNext').textContent = qi === sub.soal.length - 1 ? 'Selesai subtes' : 'Lanjut';
+}
+
+function pick(it, k){
+  if(it.pilih > 1){
+    let s = [].concat(ans[it.id] || []);
+    s = s.includes(k) ? s.filter(x => x !== k) : (s.length < it.pilih ? s.concat(k) : s.slice(1).concat(k));
+    ans[it.id] = s;
+  } else ans[it.id] = k;
+  renderQ();
+}
+
+function next(){
+  if(++qi >= S.subtes[si].soal.length) endSub(); else renderQ();
+}
+
+function endSub(){
+  clearInterval(tick); active = false;
+  if(++si >= S.subtes.length) finish(); else introSub();
+}
+
+async function finish(){
+  active = false; clearInterval(tick); exitFS();
+  show('done');
+  $('d-judul').textContent = 'Menyimpan jawaban...'; $('d-isi').textContent = 'Jangan tutup halaman ini.';
+  $('btnRetry').hidden = true;
+  try{
+    const r = await api({action:'submit', token, answers:ans, violations:viol});
+    if(!r.ok) throw new Error(r.msg);
+    $('d-judul').textContent = 'Tes selesai';
+    $('d-isi').textContent = 'Terima kasih. Jawaban Anda sudah tersimpan. Anda boleh menutup halaman ini.';
+  }catch(e){
+    $('d-judul').textContent = 'Gagal menyimpan';
+    $('d-isi').textContent = 'Periksa koneksi internet, lalu tekan tombol kirim ulang. Jangan tutup halaman ini.';
+    $('btnRetry').hidden = false;
+  }
+}
+
+// ===== Deteksi pelanggaran =====
+function flag(){
+  if(!active) return;
+  viol++;
+  $('warn').hidden = false;
+  $('warn').textContent = 'Peringatan: Anda meninggalkan halaman tes (' + viol + '/' + MAXV + '). Pelanggaran dicatat.';
+  if(viol >= MAXV) finish();
+  else if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+}
+document.addEventListener('visibilitychange', () => { if(document.hidden) flag(); });
+document.addEventListener('fullscreenchange', () => { if(!document.fullscreenElement) flag(); });
+document.addEventListener('contextmenu', e => e.preventDefault());
+['copy','cut','paste'].forEach(ev => document.addEventListener(ev, e => { if(e.target.id !== 'tok') e.preventDefault(); }));
+window.addEventListener('beforeunload', e => { if(active){ e.preventDefault(); e.returnValue = ''; } });
+</script>
+</body>
+</html>
