@@ -51,27 +51,7 @@ h3{margin:0 0 6px;font-size:16px}
 .intro-t{color:var(--tx);margin:14px 0 4px;font-size:17px}
 
 
-/* ===== PERLINDUNGAN TAMPILAN (BROWSER) ===== */
-#exam-watermark {
-  position: fixed;
-  inset: 0;
-  z-index: 900;
-  display: none;
-  overflow: hidden;
-  pointer-events: none;
-  user-select: none;
-  -webkit-user-select: none;
-}
-.wm-item {
-  position: absolute;
-  color: var(--tx);
-  opacity: .15;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  white-space: nowrap;
-  transform: rotate(-28deg);
-}
+/* ===== SCREEN GUARD: menutup tampilan saat halaman tidak aktif ===== */
 #screen-guard {
   position: fixed;
   inset: 0;
@@ -150,14 +130,11 @@ h3{margin:0 0 6px;font-size:16px}
 
 </div>
 
-<!-- Watermark identitas peserta; tidak memblokir interaksi soal -->
-<div id="exam-watermark" aria-hidden="true"></div>
-
 <!-- Ditampilkan saat browser melaporkan halaman tidak aktif -->
 <div id="screen-guard" role="status" aria-live="polite">
   <div class="guard-content">
-    <h2>🔒 Sesi Tes Terlindungi</h2>
-    <p>Halaman tes sedang tidak aktif. Kembali ke halaman ujian untuk melanjutkan.</p>
+    <h2>Halaman Tes Ditutup Sementara</h2>
+    <p>Halaman tes tidak aktif. Kembali ke halaman ujian untuk melanjutkan.</p>
   </div>
 </div>
 
@@ -170,31 +147,12 @@ let S, token, si = 0, qi = 0, ans = {}, viol = 0, active = false, deadline, tick
 let lastViolationAt = 0;
 let fullscreenWasEntered = false;
 
-// Watermark berulang memakai token yang sudah tervalidasi.
-// Token digunakan sebagai penanda audit; bukan penghalang screenshot.
-function activateWatermark() {
-  const wm = $('exam-watermark');
-  wm.innerHTML = '';
-  const label = 'CONFIDENTIAL | TOKEN: ' + token;
-
-  for (let i = 0; i < 20; i++) {
-    const item = document.createElement('span');
-    item.className = 'wm-item';
-    item.textContent = label;
-    item.style.left = ((i % 4) * 27 - 5) + '%';
-    item.style.top = (Math.floor(i / 4) * 23 + 4) + '%';
-    wm.appendChild(item);
-  }
-  wm.style.display = 'block';
-}
-
 function hideScreenGuard() {
   $('screen-guard').classList.remove('visible');
 }
 
 function removeProtection() {
   hideScreenGuard();
-  $('exam-watermark').style.display = 'none';
 }
 
 
@@ -283,7 +241,6 @@ function introSub(){
 
 function beginSub(){
   qi = 0; active = true;
-  activateWatermark();
   deadline = Date.now() + S.subtes[si].menit * 60000;
   clearInterval(tick);
   tick = setInterval(() => {
@@ -358,7 +315,8 @@ async function finish(){
 function cekTombol(){ $('btnStart').disabled = !$('tok').value.trim(); }
 $('tok').addEventListener('input', cekTombol);
 
-// ===== DETEKSI AKTIVITAS & PERLINDUNGAN BROWSER =====
+// ===== DETEKSI AKTIVITAS & SCREEN GUARD (TANPA WATERMARK) =====
+// Catatan: browser tidak menyediakan event yang andal untuk mendeteksi atau memblokir screenshot.
 function flag(reason = 'Meninggalkan halaman tes') {
   if (!active) return;
 
