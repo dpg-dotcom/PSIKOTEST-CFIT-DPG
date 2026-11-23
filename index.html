@@ -50,7 +50,8 @@ h3{margin:0 0 6px;font-size:16px}
 .kv4 .e{font-size:20px;line-height:1.25;text-align:center}
 .intro-t{color:var(--tx);margin:14px 0 4px;font-size:17px}
 
-/* ===== PERLINDUNGAN TAMPILAN TES ===== */
+
+/* ===== PERLINDUNGAN TAMPILAN (BROWSER) ===== */
 #exam-watermark {
   position: fixed;
   inset: 0;
@@ -64,9 +65,10 @@ h3{margin:0 0 6px;font-size:16px}
 .wm-item {
   position: absolute;
   color: var(--tx);
-  opacity: .16;
+  opacity: .15;
   font-size: 13px;
   font-weight: 700;
+  letter-spacing: 1px;
   white-space: nowrap;
   transform: rotate(-28deg);
 }
@@ -81,11 +83,10 @@ h3{margin:0 0 6px;font-size:16px}
   text-align: center;
   color: #fff;
   background: rgba(12,17,29,.97);
-  backdrop-filter: blur(18px);
 }
 #screen-guard.visible { display: flex; }
-.guard-content { max-width: 360px; }
-.guard-content h2 { margin-bottom: 12px; }
+#screen-guard .guard-content { max-width: 340px; }
+#screen-guard h2 { margin-bottom: 12px; }
 
 </style>
 </head>
@@ -149,8 +150,10 @@ h3{margin:0 0 6px;font-size:16px}
 
 </div>
 
-<!-- Watermark dan layar perlindungan -->
+<!-- Watermark identitas peserta; tidak memblokir interaksi soal -->
 <div id="exam-watermark" aria-hidden="true"></div>
+
+<!-- Ditampilkan saat browser melaporkan halaman tidak aktif -->
 <div id="screen-guard" role="status" aria-live="polite">
   <div class="guard-content">
     <h2>🔒 Sesi Tes Terlindungi</h2>
@@ -164,6 +167,36 @@ const MAXV = 3;                          // batas pelanggaran sebelum tes otomat
 
 const $ = id => document.getElementById(id);
 let S, token, si = 0, qi = 0, ans = {}, viol = 0, active = false, deadline, tick;
+let lastViolationAt = 0;
+let fullscreenWasEntered = false;
+
+// Watermark berulang memakai token yang sudah tervalidasi.
+// Token digunakan sebagai penanda audit; bukan penghalang screenshot.
+function activateWatermark() {
+  const wm = $('exam-watermark');
+  wm.innerHTML = '';
+  const label = 'CONFIDENTIAL | TOKEN: ' + token;
+
+  for (let i = 0; i < 20; i++) {
+    const item = document.createElement('span');
+    item.className = 'wm-item';
+    item.textContent = label;
+    item.style.left = ((i % 4) * 27 - 5) + '%';
+    item.style.top = (Math.floor(i / 4) * 23 + 4) + '%';
+    wm.appendChild(item);
+  }
+  wm.style.display = 'block';
+}
+
+function hideScreenGuard() {
+  $('screen-guard').classList.remove('visible');
+}
+
+function removeProtection() {
+  hideScreenGuard();
+  $('exam-watermark').style.display = 'none';
+}
+
 
 function show(n){ document.querySelectorAll('.scr').forEach(s => s.hidden = s.id !== 's-' + n); }
 async function api(body){
@@ -171,30 +204,6 @@ async function api(body){
   return r.json();
 }
 const isImg = s => /^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg)(\?\S*)?$/i.test(s);
-
-// ===== WATERMARK IDENTITAS PESERTA =====
-function activateWatermark() {
-  const wm = $('exam-watermark');
-  const label = 'CONFIDENTIAL | PESERTA: ' + token.slice(-4);
-  wm.innerHTML = '';
-
-  // Watermark berulang agar tetap terlihat pada potongan screenshot.
-  for (let i = 0; i < 24; i++) {
-    const item = document.createElement('span');
-    item.className = 'wm-item';
-    item.textContent = label;
-    item.style.left = ((i % 4) * 27 - 5) + '%';
-    item.style.top = (Math.floor(i / 4) * 24 + 3) + '%';
-    wm.appendChild(item);
-  }
-  wm.style.display = 'block';
-}
-
-function removeProtection() {
-  $('screen-guard').classList.remove('visible');
-  $('exam-watermark').style.display = 'none';
-}
-
 // ===== PRELOAD GAMBAR SOAL =====
 function preloadImages(data) {
   data.subtes.forEach(sub => {
@@ -274,6 +283,7 @@ function introSub(){
 
 function beginSub(){
   qi = 0; active = true;
+  activateWatermark();
   deadline = Date.now() + S.subtes[si].menit * 60000;
   clearInterval(tick);
   tick = setInterval(() => {
@@ -348,42 +358,49 @@ async function finish(){
 function cekTombol(){ $('btnStart').disabled = !$('tok').value.trim(); }
 $('tok').addEventListener('input', cekTombol);
 
-// ===== DETEKSI PELANGGARAN =====
-let lastViolationAt = 0;
-function flag(reason = 'Meninggalkan halaman tes'){
-  if(!active) return;
+// ===== DETEKSI AKTIVITAS & PERLINDUNGAN BROWSER =====
+function flag(reason = 'Meninggalkan halaman tes') {
+  if (!active) return;
 
-  // Satu perpindahan dapat memicu visibilitychange dan fullscreenchange.
-  // Jeda ini mencegah satu kejadian dihitung dua kali.
+  // visibilitychange dan fullscreenchange bisa terjadi hampir bersamaan.
+  // Debounce mencegah satu kejadian dihitung dua kali.
   const now = Date.now();
-  if(now - lastViolationAt < 1500) return;
+  if (now - lastViolationAt < 1800) return;
   lastViolationAt = now;
 
   viol++;
   $('warn').hidden = false;
   $('warn').textContent = 'Peringatan: ' + reason + ' (' + viol + '/' + MAXV + '). Pelanggaran dicatat.';
 
-  if(viol >= MAXV) finish();
-  else if(!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch(()=>{});
+  if (viol >= MAXV) {
+    finish();
+  } else if (document.fullscreenEnabled && !document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
   }
 }
 
 document.addEventListener('visibilitychange', () => {
-  if(!active) return;
-  if(document.hidden) {
+  if (!active) return;
+  if (document.hidden) {
     $('screen-guard').classList.add('visible');
-    flag('Meninggalkan halaman atau berpindah aplikasi');
+    flag('Berpindah aplikasi atau tab');
   } else {
-    $('screen-guard').classList.remove('visible');
+    hideScreenGuard();
   }
 });
 
 document.addEventListener('fullscreenchange', () => {
-  if(active && !document.fullscreenElement) {
+  if (!active) return;
+  if (fullscreenWasEntered && !document.fullscreenElement) {
     flag('Keluar dari mode layar penuh');
   }
 });
+
+// Catat bahwa fullscreen pernah berhasil dimasuki.
+document.addEventListener('fullscreenchange', () => {
+  if (document.fullscreenElement) fullscreenWasEntered = true;
+});
+
 document.addEventListener('contextmenu', e => e.preventDefault());
 ['copy','cut','paste'].forEach(ev => document.addEventListener(ev, e => { if(e.target.id !== 'tok') e.preventDefault(); }));
 window.addEventListener('beforeunload', e => { if(active){ e.preventDefault(); e.returnValue = ''; } });
