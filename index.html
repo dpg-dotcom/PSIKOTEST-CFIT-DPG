@@ -4,7 +4,288 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Tes Kemampuan</title>
+<style><!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tes Kemampuan</title>
 <style>
+:root{--bg:#f4f5f7;--card:#fff;--tx:#1c1f24;--mut:#666;--pri:#2563eb;--bd:#d9dce1;--bad:#c62828}
+@media(prefers-color-scheme:dark){:root{--bg:#14161a;--card:#1e2126;--tx:#eceef1;--mut:#9aa0a8;--pri:#5b8def;--bd:#343941;--bad:#ef6b6b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,sans-serif;display:flex;justify-content:center;padding:16px;min-height:100vh;user-select:none;-webkit-user-select:none}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:24px;width:100%;max-width:640px;align-self:flex-start}
+h1,h2{margin:0 0 8px}
+p{color:var(--mut);margin:8px 0}
+input{width:100%;padding:12px;font-size:18px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);text-transform:uppercase;letter-spacing:2px;margin:12px 0}
+button{font:inherit;cursor:pointer}
+.btn{background:var(--pri);color:#fff;border:0;border-radius:8px;padding:12px 20px;margin-top:12px}
+.btn:disabled{opacity:.5}
+.opt{display:block;width:100%;text-align:left;background:var(--bg);color:var(--tx);border:2px solid var(--bd);border-radius:8px;padding:12px;margin:8px 0}
+.opt.on{border-color:var(--pri);background:color-mix(in srgb,var(--pri) 15%,var(--bg))}
+.top{display:flex;justify-content:space-between;font-weight:600;margin-bottom:12px}
+#timer.low{color:var(--bad)}
+#warn{background:color-mix(in srgb,var(--bad) 15%,var(--card));color:var(--bad);border-radius:8px;padding:8px 12px;margin-bottom:12px}
+#err{color:var(--bad)}
+img{max-width:100%;border-radius:8px;margin:8px 0}
+.opt img{max-height:120px;margin:0}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row .opt{width:auto;min-width:58px;text-align:center;font-weight:600}
+#qimg img{width:100%;height:auto}
+[hidden]{display:none!important}
+h3{margin:0 0 6px;font-size:16px}
+.box{background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:12px 16px;margin:14px 0}
+.box ul{margin:6px 0 2px;padding-left:20px}
+.box li{margin:6px 0;color:var(--tx)}
+.lead{color:var(--tx);font-size:17px}
+.meta,.step{color:var(--mut);font-size:14px;margin:0}
+.chk{display:flex;gap:10px;align-items:flex-start;margin:16px 0 4px;color:var(--tx);cursor:pointer}
+.chk input{width:auto;margin:4px 0 0;transform:scale(1.3);text-transform:none;letter-spacing:0}
+.lbl{display:block;margin-top:14px;font-weight:600}
+#i-contoh{background:#fff;border:1px solid var(--bd);border-radius:8px;width:100%;height:auto;margin:6px 0}
+.tip{border-left:4px solid var(--pri)}
+.r{display:flex;gap:12px;align-items:flex-start;margin:10px 0;font-size:18px;line-height:1.35;color:var(--tx)}
+.r .e{font-size:24px;line-height:1.2;width:32px;text-align:center;flex:none}
+.small{font-size:13px;color:var(--mut);margin:10px 0 0;text-align:center}
+#btnStart{width:100%;font-size:18px;padding:14px}
+.kv{display:grid;grid-template-columns:118px 14px 1fr;gap:10px 0;margin:12px 0;font-size:17px;line-height:1.4;color:var(--tx)}
+.kv .k{font-weight:600}
+.kv4{display:grid;grid-template-columns:30px 102px 12px 1fr;gap:10px 0;margin:12px 0;font-size:16px;line-height:1.4;color:var(--tx);align-items:start}
+.kv4 .k{font-weight:600}
+.kv4 .e{font-size:20px;line-height:1.25;text-align:center}
+.intro-t{color:var(--tx);margin:14px 0 4px;font-size:17px}
+</style>
+</head>
+<body>
+<div class="card">
+
+<section id="s-login" class="scr">
+  <h1>Tes Kemampuan Berpikir</h1>
+  <div class="kv4" style="margin:6px 0 0"><span class="e">🕒</span><span class="k">Durasi</span><span>:</span><span>± 23 menit (5 bagian)</span></div>
+
+  <p class="intro-t" style="font-size:16px">Sebagai persiapan sebelum mulai, perhatikan ketentuan tes berikut :</p>
+
+  <div class="kv4">
+    <span class="e">⏱</span><span class="k">Waktu</span><span>:</span><span>Setiap bagian soal ada batas waktunya, jika habis otomatis lanjut ke bagian berikutnya.</span>
+    <span class="e">👆</span><span class="k">Tampilan</span><span>:</span><span>Satu soal satu layar. Pilih jawaban yang benar, lalu klik <b>Lanjut</b>.</span>
+    <span class="e">⛔</span><span class="k">Navigasi</span><span>:</span><span>Tidak bisa kembali ke soal sebelumnya.</span>
+    <span class="e">✅</span><span class="k">Penilaian</span><span>:</span><span>Jawaban salah tidak mengurangi nilai, pastikan semua soal terisi.</span>
+    <span class="e">📵</span><span class="k">Aturan layar</span><span>:</span><span>Jangan keluar dari halaman ini. Keluar 3 kali, maka tes otomatis berhenti.</span>
+    <span class="e">📱</span><span class="k">Layar HP</span><span>:</span><span>Putar ke posisi mendatar (landscape) agar gambar terlihat lebih jelas.</span>
+  </div>
+
+  <label class="lbl" for="tok">Kode token :</label>
+  <input id="tok" placeholder="Contoh: K7M2QX" autocomplete="off" maxlength="12">
+  <div id="err"></div>
+  <button class="btn" id="btnStart" onclick="mulai()" disabled>Mulai</button>
+  <p class="small">Dengan menekan Mulai, Anda setuju mengerjakan sendiri dan jujur. Token hanya bisa dipakai 1 kali.</p>
+</section>
+
+<section id="s-intro" class="scr" hidden>
+  <p class="step" id="i-step"></p>
+  <h2 id="i-nama"></h2>
+
+  <div class="kv">
+    <span class="k">Soal</span><span>:</span><span id="i-soal"></span>
+    <span class="k">Waktu</span><span>:</span><span id="i-waktu"></span>
+    <span class="k">Petunjuk</span><span>:</span><span id="i-pet"></span>
+    <span class="k">Cara menjawab</span><span>:</span><span id="i-cara"></span>
+  </div>
+
+  <img id="i-contoh" alt="Contoh soal" hidden>
+  <p id="i-contohtxt" style="color:var(--tx);margin:4px 0"></p>
+
+  <button class="btn" onclick="beginSub()">Mulai subtes</button>
+  <p class="small">Waktu mulai berjalan setelah tombol diklik.</p>
+</section>
+
+<section id="s-quiz" class="scr" hidden>
+  <div id="warn" hidden></div>
+  <div class="top"><span id="prog"></span><span id="timer"></span></div>
+  <div id="q"></div>
+  <div id="qimg"></div>
+  <div id="opts"></div>
+  <button class="btn" id="btnNext" onclick="next()">Lanjut</button>
+</section>
+
+<section id="s-done" class="scr" hidden>
+  <h2 id="d-judul">Menyimpan jawaban...</h2>
+  <p id="d-isi">Jangan tutup halaman ini.</p>
+  <button class="btn" id="btnRetry" onclick="finish()" hidden>Coba kirim ulang</button>
+</section>
+
+</div>
+<script>
+const API = "https://script.google.com/macros/s/AKfycbxSHzEM62be9NC9y173hRWqIdjxLArsoWGxMStoSb2cN_n_brQgrAPxuLQ6eeoYHvtARw/exec"; // URL deployment Apps Script (berakhiran /exec)
+const MAXV = 3;                          // batas pelanggaran sebelum tes otomatis diakhiri
+
+const $ = id => document.getElementById(id);
+let S, token, si = 0, qi = 0, ans = {}, viol = 0, active = false, deadline, tick;
+
+function show(n){ document.querySelectorAll('.scr').forEach(s => s.hidden = s.id !== 's-' + n); }
+async function api(body){
+  const r = await fetch(API, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(body)});
+  return r.json();
+}
+const isImg = s => /^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg)(\?\S*)?$/i.test(s);
+
+async function mulai(){
+  token = $('tok').value.trim().toUpperCase();
+  if(!token) return;
+  $('btnStart').disabled = true; $('err').textContent = '';
+  try{ await document.documentElement.requestFullscreen(); }catch(e){}
+  try{
+    const r = await api({action:'start', token});
+    if(!r.ok){ $('err').textContent = r.msg; $('btnStart').disabled = false; exitFS(); return; }
+    S = r; si = 0; introSub();
+  }catch(e){
+    $('err').textContent = 'Gagal terhubung. Periksa koneksi lalu coba lagi.';
+    $('btnStart').disabled = false; exitFS();
+  }
+}
+function exitFS(){ if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); }
+
+const INFO = {
+  1: { ringkas: 'Pilih gambar yang melanjutkan urutan.',
+       cara: 'Klik 1 huruf jawaban, lalu klik Lanjut.', contoh: '' },
+  2: { ringkas: 'Pilih 2 gambar yang berbeda dari yang lain.',
+       cara: 'Klik 2 huruf jawaban, lalu klik Lanjut.', contoh: 'Jawaban contoh: B dan D, lalu C dan E.' },
+  3: { ringkas: 'Pilih gambar yang melengkapi kotak kosong.',
+       cara: 'Klik 1 huruf jawaban, lalu klik Lanjut.', contoh: '' },
+  4: { ringkas: 'Pilih gambar yang bisa diberi titik di posisi yang sama seperti gambar di kiri.',
+       cara: 'Klik 1 huruf jawaban, lalu klik Lanjut.', contoh: '' },
+  5: { ringkas: 'Hitung soal berikut. Jawaban berupa angka. TANPA kalkulator.',
+       cara: 'Ketik angka jawaban di kotak, lalu klik Lanjut. Koma atau titik boleh.', contoh: 'Contoh: 5,6 atau 5.6' }
+};
+const fmtMenit = m => String(m).replace('.', ',') + ' menit';
+
+function introSub(){
+  const s = S.subtes[si], f = INFO[s.id] || { ringkas: s.petunjuk, cara: '', contoh: '' };
+  $('i-step').textContent = 'Bagian ' + (si + 1) + ' dari ' + S.subtes.length;
+  $('i-nama').textContent = s.nama;
+  $('i-soal').textContent = s.soal.length + ' soal';
+  $('i-waktu').textContent = fmtMenit(s.menit);
+  $('i-pet').textContent = f.ringkas;
+  $('i-cara').textContent = f.cara;
+  $('i-contohtxt').textContent = f.contoh;
+  const img = $('i-contoh'); img.hidden = true;
+  const q = s.soal.find(x => x.gambar);
+  if(q){
+    img.onload = () => { img.hidden = false; };
+    img.onerror = () => { img.hidden = true; };
+    img.src = q.gambar.replace(/\/[^\/]*$/, '') + '/contoh-s' + s.id + '.png'; // folder sama dengan gambar soal
+  }
+  show('intro');
+  window.scrollTo(0, 0);
+}
+
+function beginSub(){
+  qi = 0; active = true;
+  deadline = Date.now() + S.subtes[si].menit * 60000;
+  clearInterval(tick);
+  tick = setInterval(() => {
+    const left = Math.max(0, deadline - Date.now());
+    const m = Math.floor(left/60000), d = Math.floor(left/1000) % 60;
+    $('timer').textContent = m + ':' + String(d).padStart(2,'0');
+    $('timer').className = left < 30000 ? 'low' : '';
+    if(left <= 0) endSub();
+  }, 250);
+  if(!S.subtes[si].soal.length){ endSub(); return; }
+  renderQ(); show('quiz');
+}
+
+function renderQ(){
+  const sub = S.subtes[si], it = sub.soal[qi];
+  $('prog').textContent = sub.nama + ' - Soal ' + (qi+1) + '/' + sub.soal.length;
+  $('q').textContent = it.soal + (it.pilih > 1 ? ' (pilih ' + it.pilih + ' jawaban)' : '');
+  $('qimg').innerHTML = '';
+  if(it.gambar){ const im = document.createElement('img'); im.src = it.gambar; $('qimg').appendChild(im); }
+  const box = $('opts'); box.innerHTML = '';
+  if(it.tipe === 'isian'){
+    box.className = '';
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.inputMode = 'decimal'; inp.autocomplete = 'off';
+    inp.placeholder = 'Ketik jawaban (angka)';
+    inp.style.cssText = 'width:100%;box-sizing:border-box;font-size:22px;padding:12px;border:2px solid #cbd5e1;border-radius:10px';
+    inp.value = ans[it.id] || '';
+    inp.oninput = () => { ans[it.id] = inp.value; };
+    inp.onkeydown = e => { if(e.key === 'Enter'){ e.preventDefault(); next(); } };
+    box.appendChild(inp);
+    $('btnNext').textContent = qi === sub.soal.length - 1 ? 'Selesai subtes' : 'Lanjut';
+    setTimeout(() => inp.focus(), 50);
+    return;
+  }
+  const huruf = it.opts.every(o => !o.t); // mode gambar utuh: tombol huruf saja
+  box.className = huruf ? 'row' : '';
+  it.opts.forEach((o, i) => {
+    const b = document.createElement('button');
+    b.className = 'opt' + ([].concat(ans[it.id] || []).includes(o.k) ? ' on' : '');
+    const lab = huruf ? o.k : String.fromCharCode(65 + i) + '. ';
+    if(isImg(o.t)){ b.append(lab); const im = document.createElement('img'); im.src = o.t; b.appendChild(im); }
+    else b.textContent = lab + o.t;
+    b.onclick = () => pick(it, o.k);
+    box.appendChild(b);
+  });
+  $('btnNext').textContent = qi === sub.soal.length - 1 ? 'Selesai subtes' : 'Lanjut';
+}
+
+function pick(it, k){
+  if(it.pilih > 1){
+    let s = [].concat(ans[it.id] || []);
+    s = s.includes(k) ? s.filter(x => x !== k) : (s.length < it.pilih ? s.concat(k) : s.slice(1).concat(k));
+    ans[it.id] = s;
+  } else ans[it.id] = k;
+  renderQ();
+}
+
+function next(){
+  if(++qi >= S.subtes[si].soal.length) endSub(); else renderQ();
+}
+
+function endSub(){
+  clearInterval(tick); active = false;
+  if(++si >= S.subtes.length) finish(); else introSub();
+}
+
+async function finish(){
+  active = false; clearInterval(tick); exitFS();
+  show('done');
+  $('d-judul').textContent = 'Menyimpan jawaban...'; $('d-isi').textContent = 'Jangan tutup halaman ini.';
+  $('btnRetry').hidden = true;
+  try{
+    const r = await api({action:'submit', token, answers:ans, violations:viol});
+    if(!r.ok) throw new Error(r.msg);
+    $('d-judul').textContent = 'Tes selesai';
+    $('d-isi').textContent = 'Terima kasih. Jawaban Anda sudah tersimpan. Anda boleh menutup halaman ini.';
+  }catch(e){
+    $('d-judul').textContent = 'Gagal menyimpan';
+    $('d-isi').textContent = 'Periksa koneksi internet, lalu tekan tombol kirim ulang. Jangan tutup halaman ini.';
+    $('btnRetry').hidden = false;
+  }
+}
+
+// tombol Mulai aktif setelah token diisi
+function cekTombol(){ $('btnStart').disabled = !$('tok').value.trim(); }
+$('tok').addEventListener('input', cekTombol);
+
+// ===== Deteksi pelanggaran =====
+function flag(){
+  if(!active) return;
+  viol++;
+  $('warn').hidden = false;
+  $('warn').textContent = 'Peringatan: Anda meninggalkan halaman tes (' + viol + '/' + MAXV + '). Pelanggaran dicatat.';
+  if(viol >= MAXV) finish();
+  else if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+}
+document.addEventListener('visibilitychange', () => { if(document.hidden) flag(); });
+document.addEventListener('fullscreenchange', () => { if(!document.fullscreenElement) flag(); });
+document.addEventListener('contextmenu', e => e.preventDefault());
+['copy','cut','paste'].forEach(ev => document.addEventListener(ev, e => { if(e.target.id !== 'tok') e.preventDefault(); }));
+window.addEventListener('beforeunload', e => { if(active){ e.preventDefault(); e.returnValue = ''; } });
+</script>
+</body>
+</html>
 :root{--bg:#f4f5f7;--card:#fff;--tx:#1c1f24;--mut:#666;--pri:#2563eb;--bd:#d9dce1;--bad:#c62828}
 @media(prefers-color-scheme:dark){:root{--bg:#14161a;--card:#1e2126;--tx:#eceef1;--mut:#9aa0a8;--pri:#5b8def;--bd:#343941;--bad:#ef6b6b}}
 *{box-sizing:border-box}
