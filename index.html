@@ -109,24 +109,6 @@ h3{margin:0 0 6px;font-size:16px}
 </section>
 
 </div>
-
-<div id="fsPause" hidden style="
-  position:fixed; inset:0; z-index:99999; background:rgba(8,15,30,.96);
-  color:#fff; display:flex; align-items:center; justify-content:center;
-  padding:24px; text-align:center;">
-  <div style="max-width:480px;">
-    <h2 style="margin:0 0 12px;">Mode Layar Penuh Diperlukan</h2>
-    <p style="line-height:1.6;margin:0 0 20px;">
-      Tes dijeda karena mode layar penuh telah dinonaktifkan.
-      Aktifkan kembali layar penuh untuk melanjutkan tes.
-    </p>
-    <button type="button" id="btnResumeFS" class="btn">
-      Kembali ke Mode Fullscreen
-    </button>
-    <p id="fsError" style="margin-top:12px;color:#ffd166;font-size:14px;"></p>
-  </div>
-</div>
-
 <script>
 const API = "https://script.google.com/macros/s/AKfycbxSHzEM62be9NC9y173hRWqIdjxLArsoWGxMStoSb2cN_n_brQgrAPxuLQ6eeoYHvtARw/exec"; // URL deployment Apps Script (berakhiran /exec)
 const MAXV = 3;                     
@@ -195,9 +177,10 @@ function introSub(){
   window.scrollTo(0, 0);
 }
 
-function startSubTimer(){
+function beginSub(){
+  qi = 0; active = true;
+  deadline = Date.now() + S.subtes[si].menit * 60000;
   clearInterval(tick);
-  deadline = Date.now() + remainingMs;
   tick = setInterval(() => {
     const left = Math.max(0, deadline - Date.now());
     const m = Math.floor(left/60000), d = Math.floor(left/1000) % 60;
@@ -205,14 +188,8 @@ function startSubTimer(){
     $('timer').className = left < 30000 ? 'low' : '';
     if(left <= 0) endSub();
   }, 250);
-}
-
-function beginSub(){
-  qi = 0; active = true;
-  remainingMs = S.subtes[si].menit * 60000;
   if(!S.subtes[si].soal.length){ endSub(); return; }
   renderQ(); show('quiz');
-  startSubTimer();
 }
 
 function renderQ(){
@@ -328,111 +305,53 @@ function cekTombol(){ $('btnStart').disabled = !$('tok').value.trim(); }
 $('tok').addEventListener('input', cekTombol);
 
 
-// ===== Deteksi pelanggaran dan pemulihan fullscreen =====
-let resetAwayTimer = null;
-let fullscreenCheckTimer = null;
+// ===== Deteksi pelanggaran =====
 
-function updateViolationMessage(){
+// Satu rangkaian meninggalkan halaman dihitung sebagai satu pelanggaran.
+function flag(){
+  if(!active || finishStarted || awayEpisode) return;
+
+  awayEpisode = true;
+  viol++;
+
   $('warn').hidden = false;
   $('warn').textContent =
     'Peringatan: Anda meninggalkan halaman tes (' +
     viol + '/' + MAXV + '). Pelanggaran dicatat.';
-}
 
-// Satu rangkaian kehilangan fokus dihitung satu kali.
-function flag(){
-  if(!active || finishStarted || awayEpisode || pausedForFullscreen) return;
-
-  awayEpisode = true;
-  viol++;
-  updateViolationMessage();
-
+  // Pelanggaran ketiga: hentikan tes dan kirim jawaban yang sudah ada.
   if(viol >= MAXV){
     finish();
-  }
-}
-
-// Jeda timer tanpa menghapus jawaban atau posisi soal.
-function pauseForFullscreen(){
-  if(!active || finishStarted || pausedForFullscreen) return;
-
-  pausedForFullscreen = true;
-  clearInterval(tick);
-  remainingMs = Math.max(0, deadline - Date.now());
-  $('fsError').textContent = '';
-  $('fsPause').hidden = false;
-}
-
-// Lanjutkan timer hanya setelah fullscreen benar-benar aktif.
-function resumeAfterFullscreen(){
-  if(!pausedForFullscreen || !document.fullscreenElement) return;
-
-  pausedForFullscreen = false;
-  $('fsPause').hidden = true;
-  $('fsError').textContent = '';
-  awayEpisode = false;
-  startSubTimer();
-}
-
-// Klik pengguna diperlukan oleh browser untuk meminta fullscreen kembali.
-$('btnResumeFS').addEventListener('click', async () => {
-  $('fsError').textContent = '';
-  try{
-    await document.documentElement.requestFullscreen();
-    if(document.fullscreenElement){
-      resumeAfterFullscreen();
-    }else{
-      $('fsError').textContent =
-        'Fullscreen belum aktif. Silakan tekan tombol ini sekali lagi.';
-    }
-  }catch(e){
-    $('fsError').textContent =
-      'Browser menolak fullscreen. Klik tombol ini untuk mencoba kembali.';
-  }
-});
-
-// Jika peserta keluar fullscreen secara manual (misalnya menekan Esc),
-// hitung satu pelanggaran lalu jeda tes dan minta fullscreen kembali.
-// Saat Alt+Tab, browser bisa melepas fullscreen otomatis ketika halaman
-// kehilangan fokus; kejadian itu tidak dihitung lagi sebagai pelanggaran kedua.
-document.addEventListener('fullscreenchange', () => {
-  clearTimeout(fullscreenCheckTimer);
-
-  if(document.fullscreenElement){
-    if(pausedForFullscreen) resumeAfterFullscreen();
     return;
   }
 
-  fullscreenCheckTimer = setTimeout(() => {
-    if(!active || finishStarted || document.hidden || !document.hasFocus()) return;
+  // Minta kembali ke fullscreen jika halaman sudah terlihat.
+  if(!document.hidden && !document.fullscreenElement){
+    document.documentElement.requestFullscreen().catch(()=>{});
+  }
+}
 
-    if(!awayEpisode){
-      flag();
-    }
+// Reset hanya setelah peserta kembali fokus, halaman terlihat,
+// dan fullscreen sudah aktif. Ini mencegah satu kejadian dihitung dua kali.
+function resetAwayEpisode(){
+  if(!document.hidden && document.hasFocus() && document.fullscreenElement){
+    awayEpisode = false;
+  }
+}
 
-    if(active && viol < MAXV){
-      pauseForFullscreen();
-    }
-  }, 350);
-});
-
-// Deteksi perpindahan tab/aplikasi.
 document.addEventListener('visibilitychange', () => {
   if(document.hidden){
     flag();
   }else{
-    clearTimeout(resetAwayTimer);
-    resetAwayTimer = setTimeout(() => {
-      if(active && !document.hidden && document.hasFocus()){
-        // Jika browser melepas fullscreen saat Alt+Tab, jangan biarkan
-        // peserta melanjutkan tes sebelum mengaktifkannya kembali.
-        if(!document.fullscreenElement && !pausedForFullscreen){
-          pauseForFullscreen();
-        }else if(document.fullscreenElement){
-          awayEpisode = false;
-        }
-      }
-    }, 500);
+    resetAwayEpisode();
+  }
+});
+
+document.addEventListener('fullscreenchange', () => {
+  if(!document.fullscreenElement){
+    flag();
+  }else{
+    resetAwayEpisode();
   }
 });
 
@@ -441,18 +360,8 @@ window.addEventListener('blur', () => {
 });
 
 window.addEventListener('focus', () => {
-  clearTimeout(resetAwayTimer);
-  resetAwayTimer = setTimeout(() => {
-    if(!active || document.hidden) return;
-
-    if(!document.fullscreenElement && !pausedForFullscreen){
-      pauseForFullscreen();
-    }else if(document.fullscreenElement){
-      awayEpisode = false;
-    }
-  }, 500);
+  resetAwayEpisode();
 });
-
 document.addEventListener('contextmenu', e => e.preventDefault());
 ['copy','cut','paste'].forEach(ev => document.addEventListener(ev, e => { if(e.target.id !== 'tok') e.preventDefault(); }));
 window.addEventListener('beforeunload', e => { if(active){ e.preventDefault(); e.returnValue = ''; } });
