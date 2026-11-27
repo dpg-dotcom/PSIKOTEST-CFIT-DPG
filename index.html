@@ -66,7 +66,6 @@ h3{margin:0 0 6px;font-size:16px}
     <span class="e">⛔</span><span class="k">Navigasi</span><span>:</span><span>Tidak bisa kembali ke soal sebelumnya.</span>
     <span class="e">✅</span><span class="k">Penilaian</span><span>:</span><span>Jawaban salah tidak mengurangi nilai, pastikan semua soal terisi.</span>
     <span class="e">📵</span><span class="k">Aturan layar</span><span>:</span><span>Jangan keluar dari halaman ini. Keluar 3 kali, maka tes otomatis berhenti.</span>
-    <span class="e">📱</span><span class="k">Layar HP</span><span>:</span><span>Putar ke posisi mendatar (landscape) agar gambar terlihat lebih jelas.</span>
   </div>
 
   <label class="lbl" for="tok">Kode token :</label>
@@ -112,11 +111,16 @@ h3{margin:0 0 6px;font-size:16px}
 </div>
 <script>
 const API = "https://script.google.com/macros/s/AKfycbxSHzEM62be9NC9y173hRWqIdjxLArsoWGxMStoSb2cN_n_brQgrAPxuLQ6eeoYHvtARw/exec"; // URL deployment Apps Script (berakhiran /exec)
-const MAXV = 3;                          // batas pelanggaran sebelum tes otomatis diakhiri
-
+const MAXV = 3;                     
+  
+// batas pelanggaran sebelum tes otomatis diakhiri
+  
 const $ = id => document.getElementById(id);
-let S, token, si = 0, qi = 0, ans = {}, viol = 0, active = false, deadline, tick;
-
+let S, token, si = 0, qi = 0, ans = {}, viol = 0;
+let active = false, deadline, tick;
+let finishStarted = false;
+let awayEpisode = false;
+  
 function show(n){ document.querySelectorAll('.scr').forEach(s => s.hidden = s.id !== 's-' + n); }
 async function api(body){
   const r = await fetch(API, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(body)});
@@ -256,18 +260,42 @@ function endSub(){
 }
 
 async function finish(){
-  active = false; clearInterval(tick); exitFS();
+  // Mencegah pengiriman hasil lebih dari satu kali
+  if(finishStarted) return;
+
+  finishStarted = true;
+  active = false;
+  clearInterval(tick);
+  exitFS();
+
   show('done');
-  $('d-judul').textContent = 'Menyimpan jawaban...'; $('d-isi').textContent = 'Jangan tutup halaman ini.';
+
+  $('d-judul').textContent = 'Menyimpan jawaban...';
+  $('d-isi').textContent = 'Jangan tutup halaman ini.';
   $('btnRetry').hidden = true;
+
   try{
-    const r = await api({action:'submit', token, answers:ans, violations:viol});
+    const r = await api({
+      action: 'submit',
+      token: token,
+      answers: ans,
+      violations: viol
+    });
+
     if(!r.ok) throw new Error(r.msg);
+
     $('d-judul').textContent = 'Tes selesai';
-    $('d-isi').textContent = 'Terima kasih. Jawaban Anda sudah tersimpan. Anda boleh menutup halaman ini.';
+    $('d-isi').textContent =
+      viol >= MAXV
+      ? 'Tes dihentikan karena mencapai 3 kali pelanggaran. Jawaban yang telah dikerjakan berhasil disimpan.'
+      : 'Terima kasih. Jawaban Anda sudah tersimpan. Anda boleh menutup halaman ini.';
+
   }catch(e){
     $('d-judul').textContent = 'Gagal menyimpan';
-    $('d-isi').textContent = 'Periksa koneksi internet, lalu tekan tombol kirim ulang. Jangan tutup halaman ini.';
+    $('d-isi').textContent =
+      'Periksa koneksi internet, lalu tekan tombol kirim ulang. Jangan tutup halaman ini.';
+
+    finishStarted = false;
     $('btnRetry').hidden = false;
   }
 }
@@ -276,17 +304,51 @@ async function finish(){
 function cekTombol(){ $('btnStart').disabled = !$('tok').value.trim(); }
 $('tok').addEventListener('input', cekTombol);
 
+
 // ===== Deteksi pelanggaran =====
+
 function flag(){
-  if(!active) return;
+  if(!active || awayEpisode) return;
+
+  // Tandai bahwa satu kejadian sedang berlangsung
+  awayEpisode = true;
+
   viol++;
+
   $('warn').hidden = false;
-  $('warn').textContent = 'Peringatan: Anda meninggalkan halaman tes (' + viol + '/' + MAXV + '). Pelanggaran dicatat.';
-  if(viol >= MAXV) finish();
-  else if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+  $('warn').textContent =
+    'Peringatan: Anda meninggalkan halaman tes (' +
+    viol + '/' + MAXV + '). Pelanggaran dicatat.';
+
+  // Jika mencapai batas, hentikan tes
+  if(viol >= MAXV){
+    finish();
+    return;
+  }
+
+  // Meminta peserta kembali ke fullscreen
+  if(!document.fullscreenElement && !document.hidden){
+    document.documentElement.requestFullscreen().catch(()=>{});
+  }
 }
-document.addEventListener('visibilitychange', () => { if(document.hidden) flag(); });
-document.addEventListener('fullscreenchange', () => { if(!document.fullscreenElement) flag(); });
+
+// Deteksi ketika peserta meninggalkan atau kembali ke halaman
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden){
+    flag();
+  }else if(document.fullscreenElement){
+    awayEpisode = false;
+  }
+});
+
+// Deteksi ketika peserta keluar atau kembali ke fullscreen
+document.addEventListener('fullscreenchange', () => {
+  if(!document.fullscreenElement){
+    flag();
+  }else if(!document.hidden){
+    awayEpisode = false;
+  }
+});
 document.addEventListener('contextmenu', e => e.preventDefault());
 ['copy','cut','paste'].forEach(ev => document.addEventListener(ev, e => { if(e.target.id !== 'tok') e.preventDefault(); }));
 window.addEventListener('beforeunload', e => { if(active){ e.preventDefault(); e.returnValue = ''; } });
