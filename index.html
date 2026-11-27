@@ -26,6 +26,12 @@ img{max-width:100%;border-radius:8px;margin:8px 0}
 .opt img{max-height:120px;margin:0}
 .row{display:flex;gap:8px;flex-wrap:wrap}
 .row .opt{width:auto;min-width:58px;text-align:center;font-weight:600}
+#nav-wrap{border-top:1px solid var(--bd);margin-top:22px;padding-top:14px}
+#question-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.qnum{margin:0;padding:9px 4px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#1c1f24;font-weight:700;min-height:42px}
+.qnum.answered{background:#2563eb;border-color:#2563eb;color:#fff}
+.qnum.current{outline:3px solid color-mix(in srgb,var(--pri) 35%,transparent);outline-offset:1px}
+@media(max-width:420px){#question-nav{grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}.qnum{padding:8px 2px}}
 #qimg img{width:100%;height:auto}
 [hidden]{display:none!important}
 h3{margin:0 0 6px;font-size:16px}
@@ -62,8 +68,8 @@ h3{margin:0 0 6px;font-size:16px}
 
   <div class="kv4">
     <span class="e">⏱</span><span class="k">Waktu</span><span>:</span><span>Setiap bagian soal ada batas waktunya, jika habis otomatis lanjut ke bagian berikutnya.</span>
-    <span class="e">👆</span><span class="k">Tampilan</span><span>:</span><span>Satu soal satu layar. Pilih jawaban yang benar, lalu klik <b>Lanjut</b>.</span>
-    <span class="e">⛔</span><span class="k">Navigasi</span><span>:</span><span>Tidak bisa kembali ke soal sebelumnya.</span>
+    <span class="e">👆</span><span class="k">Tampilan</span><span>:</span><span>Satu soal ditampilkan setiap layar. Gunakan daftar nomor untuk berpindah antarsoal.</span>
+    <span class="e">🔢</span><span class="k">Navigasi</span><span>:</span><span>Anda dapat melewati soal dan kembali mengerjakannya selama waktu subtes masih tersedia.</span>
     <span class="e">✅</span><span class="k">Penilaian</span><span>:</span><span>Jawaban salah tidak mengurangi nilai, pastikan semua soal terisi.</span>
     <span class="e">📵</span><span class="k">Aturan layar</span><span>:</span><span>Jangan keluar dari halaman ini. Keluar 3 kali, maka tes otomatis berhenti.</span>
   </div>
@@ -99,7 +105,11 @@ h3{margin:0 0 6px;font-size:16px}
   <div id="q"></div>
   <div id="qimg"></div>
   <div id="opts"></div>
-  <button class="btn" id="btnNext" onclick="next()">Lanjut</button>
+  <div id="nav-wrap">
+    <h3>Daftar Nomor Soal</h3>
+    <p class="small" style="text-align:left;margin:4px 0 10px">Putih: belum dijawab · Biru: sudah dijawab</p>
+    <div id="question-nav" aria-label="Daftar nomor soal"></div>
+  </div>
 </section>
 
 <section id="s-done" class="scr" hidden>
@@ -192,8 +202,31 @@ function beginSub(){
   renderQ(); show('quiz');
 }
 
+function sudahDijawab(it){
+  const v = ans[it.id];
+  if(it.tipe === 'isian') return typeof v === 'string' && v.trim() !== '';
+  if(it.pilih > 1) return Array.isArray(v) && v.length >= it.pilih;
+  return v !== undefined && v !== null && v !== '';
+}
+
+function renderQuestionNav(){
+  const sub = S.subtes[si], nav = $('question-nav');
+  nav.innerHTML = '';
+  sub.soal.forEach((it, index) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'qnum' + (sudahDijawab(it) ? ' answered' : '') + (index === qi ? ' current' : '');
+    b.textContent = index + 1;
+    b.setAttribute('aria-label', 'Soal ' + (index + 1) + (sudahDijawab(it) ? ', sudah dijawab' : ', belum dijawab'));
+    b.setAttribute('aria-current', index === qi ? 'true' : 'false');
+    b.onclick = () => { qi = index; renderQ(); };
+    nav.appendChild(b);
+  });
+}
+
 function renderQ(){
   const sub = S.subtes[si], it = sub.soal[qi];
+  renderQuestionNav();
   $('prog').textContent = sub.nama + ' - Soal ' + (qi+1) + '/' + sub.soal.length;
   $('q').textContent = it.soal + (it.pilih > 1 ? ' (pilih ' + it.pilih + ' jawaban)' : '');
   $('qimg').innerHTML = '';
@@ -210,12 +243,9 @@ function renderQ(){
     const cek = () => {
       const v = inp.value, ok = v.trim() === '' || /^[0-9.,\s]+$/.test(v) && /\d/.test(v);
       hint.textContent = ok ? '' : 'Hanya boleh angka (boleh titik, koma, spasi).';
-      $('btnNext').disabled = !ok;
     };
-    inp.oninput = () => { ans[it.id] = inp.value; cek(); };
-    inp.onkeydown = e => { if(e.key === 'Enter'){ e.preventDefault(); next(); } };
+    inp.oninput = () => { ans[it.id] = inp.value; cek(); renderQuestionNav(); };
     box.appendChild(inp); box.appendChild(hint); cek();
-    $('btnNext').textContent = qi === sub.soal.length - 1 ? 'Selesai subtes' : 'Lanjut';
     setTimeout(() => inp.focus(), 50);
     return;
   }
@@ -230,12 +260,10 @@ function renderQ(){
     b.onclick = () => pick(it, o.k);
     box.appendChild(b);
   });
-  $('btnNext').textContent = qi === sub.soal.length - 1 ? 'Selesai subtes' : 'Lanjut';
   const nPilih = [].concat(ans[it.id] || []).length;
-  $('btnNext').disabled = nPilih < (it.pilih || 1) && it.pilih > 1; // soal pilih 2: harus pilih 2 dulu
   if(it.pilih > 1){
     const h = document.createElement('div'); h.className = 'small';
-    h.textContent = 'Terpilih ' + nPilih + ' dari ' + it.pilih + '. Pilih ' + it.pilih + ' jawaban untuk lanjut.';
+    h.textContent = 'Terpilih ' + nPilih + ' dari ' + it.pilih + ' jawaban.';
     box.appendChild(h);
   }
 }
@@ -249,10 +277,6 @@ function pick(it, k){
   renderQ();
 }
 
-function next(){
-  if($('btnNext').disabled) return;
-  if(++qi >= S.subtes[si].soal.length) endSub(); else renderQ();
-}
 
 function endSub(){
   clearInterval(tick); active = false;
