@@ -29,7 +29,15 @@ img{max-width:100%;border-radius:8px;margin:8px 0}
 #nav-wrap{border-top:1px solid var(--bd);margin-top:22px;padding-top:14px}
 #question-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
 #btnFinishSub{display:block;width:100%;margin-top:18px;padding:12px 16px;background:#15803d;color:#fff;border:0;border-radius:8px;font-weight:700}
-#btnFinishSub:hover{filter:brightness(.96)}
+#btnFinishSub:hover:not(:disabled){filter:brightness(.96)}
+#btnFinishSub:disabled{opacity:.45;cursor:not-allowed}
+#finish-progress{margin-top:8px;text-align:center}
+#finish-confirm{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;padding:20px}
+#finish-confirm .dialog{width:100%;max-width:380px;background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:14px;padding:22px;box-shadow:0 18px 50px rgba(0,0,0,.3)}
+#finish-confirm .actions{display:flex;gap:10px;margin-top:18px}
+#finish-confirm .actions button{flex:1;padding:11px;border:0;border-radius:8px;font-weight:700}
+#finish-cancel{background:var(--bg);color:var(--tx);border:1px solid var(--bd)!important}
+#finish-yes{background:#15803d;color:white}
 .qnum{margin:0;padding:9px 4px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#1c1f24;font-weight:700;min-height:42px}
 .qnum.answered{background:#2563eb;border-color:#2563eb;color:#fff}
 .qnum.current{outline:3px solid color-mix(in srgb,var(--pri) 35%,transparent);outline-offset:1px}
@@ -111,8 +119,8 @@ h3{margin:0 0 6px;font-size:16px}
     <h3>Daftar Nomor Soal</h3>
     <p class="small" style="text-align:left;margin:4px 0 10px">Putih: belum dijawab · Biru: sudah dijawab</p>
     <div id="question-nav" aria-label="Daftar nomor soal"></div>
-    <button type="button" id="btnFinishSub" onclick="selesaiSub()">Selesai &amp; Lanjut</button>
-    <p class="small">Jika sudah selesai lebih cepat, tekan tombol ini. Soal yang belum dijawab akan tetap kosong.</p>
+    <button type="button" id="btnFinishSub" onclick="bukaKonfirmasiSelesai()" disabled>Selesai &amp; Lanjut</button>
+    <p id="finish-progress" class="small">Jawab semua soal terlebih dahulu untuk mengaktifkan tombol.</p>
   </div>
 </section>
 
@@ -122,6 +130,16 @@ h3{margin:0 0 6px;font-size:16px}
   <button class="btn" id="btnRetry" onclick="finish()" hidden>Coba kirim ulang</button>
 </section>
 
+</div>
+<div id="finish-confirm" hidden role="dialog" aria-modal="true" aria-labelledby="finish-title">
+  <div class="dialog">
+    <h2 id="finish-title">Konfirmasi penyelesaian</h2>
+    <p id="finish-message">Apakah Anda yakin ingin melanjutkan?</p>
+    <div class="actions">
+      <button type="button" id="finish-cancel" onclick="tutupKonfirmasiSelesai()">Periksa Kembali</button>
+      <button type="button" id="finish-yes" onclick="konfirmasiSelesai()">Ya, Lanjutkan</button>
+    </div>
+  </div>
 </div>
 <script>
 const API = "https://script.google.com/macros/s/AKfycbxSHzEM62be9NC9y173hRWqIdjxLArsoWGxMStoSb2cN_n_brQgrAPxuLQ6eeoYHvtARw/exec"; // URL deployment Apps Script (berakhiran /exec)
@@ -194,6 +212,7 @@ function introSub(){
 function beginSub(){
   qi = 0; active = true;
   $('btnFinishSub').textContent = si === S.subtes.length - 1 ? 'Selesaikan Tes' : 'Selesai & Lanjut ke Subtes Berikutnya';
+  updateFinishButton();
   deadline = Date.now() + S.subtes[si].menit * 60000;
   clearInterval(tick);
   tick = setInterval(() => {
@@ -214,6 +233,17 @@ function sudahDijawab(it){
   return v !== undefined && v !== null && v !== '';
 }
 
+function updateFinishButton(){
+  const soal = S.subtes[si].soal;
+  const terjawab = soal.filter(sudahDijawab).length;
+  const lengkap = soal.length > 0 && terjawab === soal.length;
+  const btn = $('btnFinishSub');
+  btn.disabled = !lengkap;
+  $('finish-progress').textContent = lengkap
+    ? 'Semua soal sudah dijawab. Anda dapat menyelesaikan bagian ini lebih awal.'
+    : 'Terjawab ' + terjawab + ' dari ' + soal.length + ' soal. Jawab semua soal untuk mengaktifkan tombol.';
+}
+
 function renderQuestionNav(){
   const sub = S.subtes[si], nav = $('question-nav');
   nav.innerHTML = '';
@@ -232,6 +262,7 @@ function renderQuestionNav(){
 function renderQ(){
   const sub = S.subtes[si], it = sub.soal[qi];
   renderQuestionNav();
+  updateFinishButton();
   $('prog').textContent = sub.nama + ' - Soal ' + (qi+1) + '/' + sub.soal.length;
   $('q').textContent = it.soal + (it.pilih > 1 ? ' (pilih ' + it.pilih + ' jawaban)' : '');
   $('qimg').innerHTML = '';
@@ -249,7 +280,7 @@ function renderQ(){
       const v = inp.value, ok = v.trim() === '' || /^[0-9.,\s]+$/.test(v) && /\d/.test(v);
       hint.textContent = ok ? '' : 'Hanya boleh angka (boleh titik, koma, spasi).';
     };
-    inp.oninput = () => { ans[it.id] = inp.value; cek(); renderQuestionNav(); };
+    inp.oninput = () => { ans[it.id] = inp.value; cek(); renderQuestionNav(); updateFinishButton(); };
     box.appendChild(inp); box.appendChild(hint); cek();
     setTimeout(() => inp.focus(), 50);
     return;
@@ -283,13 +314,19 @@ function pick(it, k){
 }
 
 
-function selesaiSub(){
-  if(!active || finishStarted) return;
+function bukaKonfirmasiSelesai(){
+  if(!active || finishStarted || $('btnFinishSub').disabled) return;
   const terakhir = si === S.subtes.length - 1;
-  const pesan = terakhir
-    ? 'Apakah Anda yakin ingin menyelesaikan tes sekarang? Soal yang belum dijawab akan tetap kosong.'
-    : 'Apakah Anda yakin ingin menyelesaikan bagian ini dan lanjut ke subtes berikutnya? Soal yang belum dijawab akan tetap kosong dan Anda tidak dapat kembali ke bagian ini.';
-  if(!window.confirm(pesan)) return;
+  $('finish-title').textContent = terakhir ? 'Selesaikan Tes?' : 'Lanjut ke Subtes Berikutnya?';
+  $('finish-message').textContent = terakhir
+    ? 'Semua soal sudah dijawab. Apakah Anda yakin ingin mengakhiri tes sekarang?'
+    : 'Semua soal pada bagian ini sudah dijawab. Apakah Anda yakin ingin melanjutkan? Setelah lanjut, Anda tidak dapat kembali ke bagian ini.';
+  $('finish-confirm').hidden = false;
+}
+function tutupKonfirmasiSelesai(){ $('finish-confirm').hidden = true; }
+function konfirmasiSelesai(){
+  if(!active || finishStarted || $('btnFinishSub').disabled) return;
+  $('finish-confirm').hidden = true;
   endSub();
 }
 
